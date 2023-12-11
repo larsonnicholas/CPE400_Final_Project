@@ -43,6 +43,13 @@ for ip, count in topDestIPs:
     print(f"{ip}: {count} packets")
 
 #Port Analysis
+sourcePorts = [packet[TCP].sport for packet in packets if TCP in packet]
+topSourcePorts = Counter(sourcePorts).most_common(5)
+
+print("\nTop Source Ports:")
+for port, count in topSourcePorts:
+    print(f"{port}: {count} appearances")
+
 destPorts = [packet[TCP].dport for packet in packets if TCP in packet]
 topDestPorts = Counter(destPorts).most_common(5)
 
@@ -52,12 +59,44 @@ for port, count in topDestPorts:
 
 #Protocol Distribution
 protocols = [packet[IP].proto for packet in packets if IP in packet]
-protocolNames = {6: 'TCP', 17: 'UDP', 1: 'ICMP'}
+protocolNames = {
+    6: 'TCP',
+    17: 'UDP',
+    1: 'ICMP'
+}
 protocols = [protocolNames.get(proto, proto) for proto in protocols]
 protocolCounts = Counter(protocols)
 
-print("\nProtocol Distribution:")
+print("\nTransport Layer Protocol Distribution:")
 for protocol, count in protocolCounts.items():
+    print(f"{protocol}: {count} packets")
+
+application_ports = {
+    53: 'DNS',
+    80: 'HTTP',
+    443: 'HTTPS',
+    21: 'FTP',
+    25: 'SMTP',
+    110: 'POP3',
+    143: 'IMAP'
+}
+application_layer_protocols = Counter()
+
+for packet in packets:
+    if IP in packet:
+        if TCP in packet:
+            if packet[TCP].dport in application_ports:
+                application_layer_protocols[application_ports[packet[TCP].dport]] += 1
+            elif packet[TCP].sport in application_ports:
+                application_layer_protocols[application_ports[packet[TCP].sport]] += 1
+        elif UDP in packet:
+            if packet[UDP].dport in application_ports:
+                application_layer_protocols[application_ports[packet[UDP].dport]] += 1
+            elif packet[UDP].sport in application_ports:
+                application_layer_protocols[application_ports[packet[UDP].sport]] += 1
+
+print("\nApplication Layer Protocol Distribution:")
+for protocol, count in application_layer_protocols.items():
     print(f"{protocol}: {count} packets")
 
 #Packet Length
@@ -107,6 +146,40 @@ for packet in packets:
         if flags & 0x80: flags_str += 'C'  # CWR
         tcp_flags_distribution[flags_str] += 1
         
-print("\nTCP Flags Distribution:")
+print("\nTCP Flag Distribution:")
 for flags, count in tcp_flags_distribution.items():
     print(f"{flags}: {count} packets")
+
+#RTT Analysis
+seq_sent_times = defaultdict(dict)
+stream_rtts = defaultdict(list)
+
+for packet in packets:
+    if TCP in packet and IP in packet:
+        stream_id = (packet[IP].src, packet[TCP].sport, packet[IP].dst, packet[TCP].dport)
+        if packet[TCP].flags & 0x17:
+            seq_sent_times[stream_id][packet[TCP].seq] = packet.time
+
+for packet in packets:
+    if TCP in packet and IP in packet:
+        stream_id = (packet[IP].src, packet[TCP].sport, packet[IP].dst, packet[TCP].dport)
+        if packet[TCP].flags & 0x10:
+            for seq, time_sent in seq_sent_times[stream_id].items():
+                if seq < packet[TCP].ack:
+                    rtt = packet.time - time_sent
+                    stream_rtts[stream_id].append(rtt)
+                    del seq_sent_times[stream_id][seq]
+                    break
+
+for stream_id, rtts in stream_rtts.items():
+    positive_rtts = [abs(float(rtt)) for rtt in rtts if rtt >= 0]
+    if positive_rtts: 
+        average_rtt = np.mean(positive_rtts)
+        max_rtt = np.max(positive_rtts)
+        min_rtt = np.min(positive_rtts)
+
+        print(f"\nStream {stream_id} - RTT measurements:")
+        print(f"  Average RTT: {average_rtt:.6f} seconds")
+        print(f"  Max RTT: {max_rtt:.6f} seconds")
+        print(f"  Min RTT: {min_rtt:.6f} seconds")
+        print(f"  RTT measurements: {len(positive_rtts)}")
