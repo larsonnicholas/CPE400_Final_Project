@@ -13,6 +13,7 @@ print(f"\nTotal packets: {totalPackets}")
 streams = {}
 stream_packet_counts = {}
 
+#Grabs each packet, creates regular and reverse tuples to increment or add to index and then we print it out
 for packet in packets:
     if IP in packet and TCP in packet:
         #Source IP, Source Port, Destination IP, Destination Port
@@ -24,11 +25,13 @@ for packet in packets:
         else:
             current_stream_index = streams.get(stream_tuple) or streams.get(reverse_tuple)
             stream_packet_counts[current_stream_index] += 1
+
+#Printing out TCP stream information
 print("\nTCP Stream Information:")
 for stream, index in streams.items():
     print(f"Stream {index}: {stream} - Packets: {stream_packet_counts[index]}")
 
-#Source and Destination Analysis
+#Source and Destination Analysis: We grap the IPs that come from source, then we output them to a file with the probability of how much they occur.
 sourceIPs = [packet[IP].src for packet in packets if IP in packet]
 total_IPs = len(sourceIPs)
 sourceIP_counts = Counter(sourceIPs)
@@ -40,6 +43,7 @@ df_source_ips = pd.DataFrame({
     'Probability': sourceIP_probabilities.values()
 })
 
+#writing out to file
 excel_filename_source_ips = 'source_ips_probabilities.xlsx'
 df_source_ips.to_excel(excel_filename_source_ips, index=False)
 
@@ -48,7 +52,7 @@ print(f"\nSource IP counts and probabilities have been written to {excel_filenam
 destIPs = [packet[IP].dst for packet in packets if IP in packet]
 
 
-#Port Analysis
+#Port Analysis: We grab the source ports and destination port, see the amount of times they occur and then we write them out to a file with a proability of how much they occur.
 sourcePorts = [packet[TCP].sport for packet in packets if TCP in packet]
 total_source_ports = len(sourcePorts)
 sourcePort_counts = Counter(sourcePorts)
@@ -60,6 +64,7 @@ df_source_ports = pd.DataFrame({
     'Probability': sourcePort_probabilities.values()
 })
 
+#writing out to file
 excel_filename_source_ports = 'source_ports_probabilities.xlsx'
 df_source_ports.to_excel(excel_filename_source_ports, index=False)
 
@@ -74,6 +79,7 @@ df_dest_ports = pd.DataFrame({
     'Probability': destPort_probabilities.values()
 })
 
+#writing out to file
 excel_filename_dest_ports = 'dest_ports_probabilities.xlsx'
 df_dest_ports.to_excel(excel_filename_dest_ports, index=False)
 
@@ -114,7 +120,7 @@ for packet in packets:
             elif packet[UDP].sport in application_ports:
                 application_layer_protocols[application_ports[packet[UDP].sport]] += 1
 
-# Transport Layer Protocol Distribution
+# Transport Layer Protocol Distribution: We check tha amount of times we see a protocol from the trasnport layer and we get the probabilities to write out to a file
 total_transport_packets = len(protocols)
 transport_protocol_probabilities = {proto: count / total_transport_packets for proto, count in protocolCounts.items()}
 
@@ -123,6 +129,8 @@ df_transport_protocols = pd.DataFrame({
     'Count': protocolCounts.values(),
     'Probability': transport_protocol_probabilities.values()
 })
+
+#writing out to file
 excel_filename_transport_protocols = 'transport_layer_protocols_probabilities.xlsx'
 df_transport_protocols.to_excel(excel_filename_transport_protocols, index=False)
 
@@ -135,13 +143,14 @@ df_application_protocols = pd.DataFrame({
     'Probability': application_protocol_probabilities.values()
 })
 
+#writing out to file
 excel_filename_application_protocols = 'application_layer_protocols_probabilities.xlsx'
 df_application_protocols.to_excel(excel_filename_application_protocols, index=False)
 
 print(f"Transport layer protocol probabilities have been written to {excel_filename_transport_protocols}")
 print(f"Application layer protocol probabilities have been written to {excel_filename_application_protocols}")
 
-#Packet Length
+#Packet Length: Grabs the packet length data from each packet and gives us an iteration of how many times we see it.
 
 packet_lengths = [len(packet) for packet in packets]
 total_volume = sum(packet_lengths)
@@ -152,6 +161,7 @@ packet_length_probabilities = {length: count / total_packet_count for length, co
 
 df = pd.DataFrame(list(packet_length_probabilities.items()), columns=['Packet Length', 'Probability'])
 
+#writing out to file
 excel_filename = 'packet_length_probabilities.xlsx'
 df.to_excel(excel_filename, index=False)
 
@@ -169,12 +179,13 @@ df_window_sizes = pd.DataFrame({
     'Probability': window_size_probabilities.values()
 })
 
+#writing out to file
 excel_filename_window_sizes = 'window_sizes_probabilities.xlsx'
 df_window_sizes.to_excel(excel_filename_window_sizes, index=False)
 
 print(f"Window size counts and probabilities have been written to {excel_filename_window_sizes}")
 
-#TCP Flags
+# TCP Flags Analysis: Counts the TCP flags that were sent amongst the packets that we go through
 tcp_flags_distribution = Counter()
 
 for packet in packets:
@@ -191,7 +202,6 @@ for packet in packets:
         if flags & 0x80: flags_str += 'C'  # CWR
         tcp_flags_distribution[flags_str] += 1
 
-# TCP Flags Analysis
 tcp_flags_distribution = Counter()
 for packet in packets:
     if TCP in packet:
@@ -208,12 +218,13 @@ df_tcp_flags = pd.DataFrame({
     'Probability': tcp_flag_probabilities.values()
 })
 
+#writing out to file
 excel_filename_tcp_flags = 'tcp_flags_probabilities.xlsx'
 df_tcp_flags.to_excel(excel_filename_tcp_flags, index=False)
 
 print(f"TCP flag combinations and probabilities have been written to {excel_filename_tcp_flags}")
 
-#RTT Analysis
+#RTT Analysis: Grabs the rtts from the stream index and grabs the minimum, maximum and average of whatever was sent through the index.
 seq_sent_times = defaultdict(dict)
 stream_rtts = defaultdict(list)
 
